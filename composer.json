@@ -1,0 +1,12 @@
+{
+	"description" : "The CodeIgniter framework",
+	"name" : "codeigniter/framework",
+	"license": "MIT",
+	"version": "3.0.0",
+	"require": {
+		"php": ">=7.0.0",
+		"phpoffice/phpword": "^1.3",
+		"phpoffice/phpspreadsheet": "^1.25",
+		"setasign/fpdi": "^2.6"
+	}
+}
