@@ -1,0 +1,7 @@
+{
+  "invoice_number": "INV-12345",
+  "items": [
+    {"name": "Product A", "price": "$10"},
+    {"name": "Product B", "price": "$15"}
+  ]
+}

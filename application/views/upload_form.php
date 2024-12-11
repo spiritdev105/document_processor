@@ -5,7 +5,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Document Processor - Upload Template</title>
-  <!-- Include Bootstrap CSS -->
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
   <style>
     body {
@@ -22,29 +21,15 @@
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
 
-    .drag-drop-area {
-      border: 2px dashed #007bff;
-      border-radius: 8px;
-      padding: 20px;
-      text-align: center;
-      background-color: #e9ecef;
-      cursor: pointer;
-    }
-
-    .drag-drop-area.drag-over {
-      background-color: #d1ecf1;
-    }
-
-    .drag-drop-area input {
-      display: none;
-    }
-
-    #loadingMessage {
-      display: none;
+    .result {
       margin-top: 20px;
-      font-size: 16px;
-      color: #007bff;
-      text-align: center;
+      padding: 15px;
+      background-color: #f0f8ff;
+      border-radius: 8px;
+    }
+
+    #error-message {
+      color: red;
     }
   </style>
 </head>
@@ -56,94 +41,110 @@
         <h3>Upload Document Template and Data</h3>
       </div>
       <div class="card-body">
-        <form id="uploadForm" action="DocumentProcessorController/upload" method="post" enctype="multipart/form-data">
-          <!-- Drag and Drop for Template -->
+        <form id="uploadForm" enctype="multipart/form-data">
+          <!-- File Input for Template -->
           <div class="form-group">
             <label for="templateFile">Document Template</label>
-            <div id="dragDropTemplate" class="drag-drop-area">
-              Drag and Drop your Template File here or Click to Browse
-              <input type="file" id="templateFile" name="template_file" accept=".doc,.docx,.rtf,.odt,.xls,.xlsx,.pdf"
-                required>
-            </div>
+            <input type="file" id="templateFile" name="template_file" class="form-control"
+              accept=".doc,.docx,.rtf,.odt,.xls,.xlsx,.pdf" required>
             <small class="form-text text-muted">Supported formats: .doc, .docx, .rtf, .odt, .xls, .xlsx, .pdf</small>
           </div>
 
-          <!-- Drag and Drop for JSON -->
+          <!-- File Input for JSON -->
           <div class="form-group">
             <label for="dataFile">Data JSON File</label>
-            <div id="dragDropJson" class="drag-drop-area">
-              Drag and Drop your JSON File here or Click to Browse
-              <input type="file" id="dataFile" name="data_file" accept=".json" required>
-            </div>
+            <input type="file" id="dataFile" name="data_file" class="form-control" accept=".json" required>
             <small class="form-text text-muted">Upload the JSON file containing data for placeholder
               replacement.</small>
           </div>
 
           <!-- Submit Button -->
           <div class="text-center">
-            <button type="submit" class="btn btn-primary btn-block" id="processButton">Process Document</button>
+            <button type="button" id="processButton" class="btn btn-primary btn-block">Process Document</button>
           </div>
         </form>
-        <!-- Loading Message -->
-        <div id="loadingMessage">
-          <span>Processing your document, please wait...</span>
+
+        <!-- Result Area -->
+        <div id="result" class="result" style="display:none;">
+          <h5>Processed Document Output</h5>
+          <pre id="resultOutput"></pre>
         </div>
+
+        <div id="error-message" style="display:none;"></div>
       </div>
     </div>
   </div>
 
   <!-- Include Bootstrap JS and jQuery -->
-  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    // Drag-and-Drop File Handling
-    function setupDragAndDrop(areaId, fileInputId) {
-      const dragDropArea = document.getElementById(areaId);
-      const fileInput = document.getElementById(fileInputId);
+    // Handle Form Submission via AJAX
+    $('#processButton').on('click', async function (e) {
+      e.preventDefault();
 
-      dragDropArea.addEventListener('click', () => fileInput.click());
+      // Get file inputs
+      const templateFile = $('#templateFile')[0].files[0];
+      const dataFile = $('#dataFile')[0].files[0];
 
-      dragDropArea.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dragDropArea.classList.add('drag-over');
-      });
+      // Validation: Ensure both files are selected
+      if (!templateFile || !dataFile) {
+        $('#error-message')
+          .text('Both template and JSON files are required.')
+          .show();
+        return;
+      }
 
-      dragDropArea.addEventListener('dragleave', () => {
-        dragDropArea.classList.remove('drag-over');
-      });
+      // Prepare FormData
+      let formData = new FormData();
+      formData.append('template_file', templateFile);
+      formData.append('data_file', dataFile);
 
-      dragDropArea.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dragDropArea.classList.remove('drag-over');
-        if (e.dataTransfer.files.length > 0) {
-          fileInput.files = e.dataTransfer.files;
-          dragDropArea.textContent = e.dataTransfer.files[0].name;
+      // Update Button State
+      $('#processButton')
+        .prop('disabled', true)
+        .html('<span class="spinner-border spinner-border-sm"></span> Processing...');
+      $('#error-message').hide();
+
+      // AJAX Request
+      $.ajax({
+        url: '<?php echo base_url('upload'); ?>',
+        type: 'POST',
+        data: formData,
+        contentType: false,
+        processData: false,
+        success: function (response) {
+          try {
+            const result = JSON.parse(response);
+            if (result.status === 'success') {
+              $('#response')
+                .text('Document processed successfully! Downloading...')
+                .addClass('success')
+                .removeClass('error')
+                .show();
+
+              // Trigger File Download
+              window.location.href = '<?= base_url('uploads/processed_document.docx') ?>';
+            } else {
+              $('#error-message').text(result.message).show();
+            }
+          } catch (e) {
+            $('#error-message')
+              .text('Unexpected response from server.')
+              .show();
+          }
+        },
+        error: function (xhr, status, error) {
+          $('#error-message')
+            .text('An error occurred: ' + error)
+            .show();
+        },
+        complete: function () {
+          $('#processButton')
+            .prop('disabled', false)
+            .text('Process Document');
         }
       });
-
-      fileInput.addEventListener('change', () => {
-        if (fileInput.files.length > 0) {
-          dragDropArea.textContent = fileInput.files[0].name;
-        }
-      });
-    }
-
-    // Initialize Drag-and-Drop for both areas
-    setupDragAndDrop('dragDropTemplate', 'templateFile');
-    setupDragAndDrop('dragDropJson', 'dataFile');
-
-    // Handle Process Document Button Click
-    document.getElementById('uploadForm').addEventListener('submit', (e) => {
-      const loadingMessage = document.getElementById('loadingMessage');
-      const processButton = document.getElementById('processButton');
-
-      // Show loading message
-      loadingMessage.style.display = 'block';
-
-      // Disable the button to prevent duplicate submissions
-      processButton.disabled = true;
-
-      // Optionally, you can further validate or display form data here.
     });
   </script>
 </body>
