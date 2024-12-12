@@ -80,31 +80,35 @@ class DocumentProcessorController extends CI_Controller
 
   private function processDocument($templateFilePath, $jsonData)
   {
-    // Load PHPWord TemplateProcessor
     try {
       $templateProcessor = new TemplateProcessor($templateFilePath);
 
-      // Replace placeholders with JSON data
       foreach ($jsonData as $key => $value) {
         if (is_array($value)) {
-          // Handle nested arrays or multidimensional data
+          // Ensure placeholders exist in the template
+          if (!$templateProcessor->getVariables()->contains($key)) {
+            throw new Exception("Placeholder {$key} not found in the template.");
+          }
+
+          // Handle nested arrays
           $templateProcessor->cloneRow($key, count($value));
           foreach ($value as $index => $row) {
             foreach ($row as $subKey => $subValue) {
-              $templateProcessor->setValue($key . '#' . ($index + 1) . '.' . $subKey, $subValue);
+              $templateProcessor->setValue("{$key}#" . ($index + 1) . ".{$subKey}", $subValue);
             }
           }
         } else {
-          // Replace single placeholders
-          $templateProcessor->setValue("{{$key}}", $value);
+          if (in_array($key, $templateProcessor->getVariables())) {
+            $templateProcessor->setValue("{{$key}}", $value);
+          } else {
+            throw new Exception("Single placeholder {$key} not found in the template.");
+          }
         }
       }
 
-      // Save the processed document
+      // Save processed document
       $processedFilePath = './uploads/processed_document.docx';
       $templateProcessor->saveAs($processedFilePath);
-
-      // Provide the processed file for download
       echo json_encode(['status' => 'success', 'output' => 'Processed document available for download.']);
       force_download($processedFilePath, null);
 
